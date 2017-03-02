@@ -1,0 +1,11 @@
+{
+  "name": "browser-storage",
+  "version": "1.0.0",
+  "description": "browser storage using localStorage and IndexedDB API",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Matheus Donizete <math.d@live.com>",
+  "license": "ISC"
+}
