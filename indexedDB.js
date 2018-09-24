@@ -1,6 +1,13 @@
 const entities = new Map();
 let db = null;
 
+class Index {
+  constructor(field = "", options = {}) {
+    this.field = field;
+    this.options = Object.assign({}, options);
+  }
+}
+
 const saveToEntity = e => {
   entities.set(e.name, { indexes: e.indexes, store: inMemory(e) });
 };
@@ -25,21 +32,38 @@ const inMemory = store => {
     delete: rule => {
       const tx = db.transaction(store.name, "readwrite");
       const storeObject = tx.objectStore(store.name);
-      storeObject.remove(rule);
+      storeObject.delete(rule);
+    },
+    clearData: () => {
+      const tx = db.transaction(store.name, "readwrite");
+      const storeObject = tx.objectStore(store.name);
+
+      return new Promise((resolve, reject) => {
+        storeObject.openCursor().onsuccess = function(event) {
+          const cursor = event.target.result;
+          if (cursor) {
+            storeObject.delete(cursor.value.id);
+            cursor.continue();
+          } else {
+            resolve();
+          }
+        };
+      });
     },
     find: value => {
       return new Promise((resolve, reject) => {
-        const store = db.transaction(store.name).objectStore(store.name);
+        const tx = db.transaction(store.name);
+        const storeObject = tx.objectStore(store.name);
         if (!!value) {
-          store.get(value).onsuccess = function(event) {
+          storeObject.get(value).onsuccess = function(event) {
             resolve(event.target.result);
           };
           return;
         }
 
         const data = [];
-        store.openCursor().onsuccess = function(event) {
-          var cursor = event.target.result;
+        storeObject.openCursor().onsuccess = function(event) {
+          const cursor = event.target.result;
           if (cursor) {
             data.push(cursor.value);
             cursor.continue();
@@ -81,23 +105,12 @@ const bindRequest = req => {
   }).catch(err => console.error("Something went wrong:", err));
 };
 
-const createBrowserDB = ({ database, stores, version = 1 }) => {
-  window.indexedDB =
-    window.indexedDB ||
-    window.mozIndexedDB ||
-    window.webkitIndexedDB ||
-    window.msIndexedDB;
-  window.IDBTransaction = window.IDBTransaction ||
-    window.webkitIDBTransaction ||
-    window.msIDBTransaction || { READ_WRITE: "readwrite" }
-  window.IDBKeyRange =
-    window.IDBKeyRange || window.webkitIDBKeyRange || window.msIDBKeyRange;
-
+const createBrowserDB = async ({ database, stores, version = 1 }) => {
   if (!window.indexedDB) {
     console.error("This browser does not support IndexedDB");
     return null;
   }
-  
+
   const req = indexedDB.open(database, version);
   req.onupgradeneeded = () => {
     db = req.result;
@@ -106,13 +119,16 @@ const createBrowserDB = ({ database, stores, version = 1 }) => {
   };
 
   applyToObjectOrArray(stores, saveToEntity);
-  return bindRequest(req, stores).then(() => Promise.resolve(entities));
+  return await bindRequest(req, stores).then(() => entities);
 };
 
 /**
  *
  * Usage Example:
  * createBrowserDB({ database: 'loraserver', stores: [{ name: 'frames', indexes: [{ field: 'name', options: { unique: true } }] }] })
+ * map.get('frames').store.add({ name: 'batata', stored: true, obj: { foo: 'baz'}})
+ * @return Promise<Map<{ indexes: Index[], store: { add, delete, find, put } }>>
  */
 
-export { createBrowserDB };
+export { Index, createBrowserDB };
+export default createBrowserDB;
