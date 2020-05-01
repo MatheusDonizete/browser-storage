@@ -102,7 +102,9 @@ const bindRequest = req => {
     };
 
     req.onerror = () => reject(req.error);
-  }).catch(err => console.error("Something went wrong:", err));
+  })
+  .then(() => entities)
+  .catch(err => console.error("Something went wrong:", err));
 };
 
 const createBrowserDB = async ({ database, stores, version = 1 }) => {
@@ -119,7 +121,7 @@ const createBrowserDB = async ({ database, stores, version = 1 }) => {
   };
 
   applyToObjectOrArray(stores, saveToEntity);
-  return await bindRequest(req, stores).then(() => entities);
+  return await bindRequest(req, stores);
 };
 
 /**
